@@ -129,7 +129,6 @@ class DiscordConfig:
             log_message(f"代理配置异常: {str(e)}", "WARNING")
             return None
 
-
 class DiscordSender:
     def __init__(self, config, log_queue, token, token_index):
         self.config = config
@@ -146,7 +145,7 @@ class DiscordSender:
             api_key=config.deepseek_api_key,
             base_url="https://api.deepseek.com"
         )
-        self.stop_flag = False
+        self.stop_flag = False  # 确保初始值为False
         
         # 修改日志记录方式
         def custom_log(message, status="INFO"):
@@ -322,22 +321,32 @@ class DiscordSender:
 
 
     def run(self):
-        """运行主循环"""
         self.log("聊天机器人启动", "SUCCESS")
         
         while not self.stop_flag:
-            # 获取频道消息
-            messages = self.get_channel_messages(limit=1)
-            if messages:
-                # 使用DeepSeek生成回复
-                ai_reply = self.process_with_deepseek(messages)
-                if ai_reply:
-                    # 发送AI生成的回复
-                    self.send_ai_message(ai_reply)
-            
-            delay = random.uniform(self.config.min_delay, self.config.max_delay)
-            self.log(f"[延时] 下次发送将在 {delay:.1f} 秒后", "INFO")
-            time.sleep(delay)
+            try:
+                # 获取频道消息
+                messages = self.get_channel_messages(limit=1)
+                if messages:
+                    # 使用DeepSeek生成回复
+                    ai_reply = self.process_with_deepseek(messages)
+                    if ai_reply:
+                        # 发送AI生成的回复
+                        self.send_ai_message(ai_reply)
+                
+                delay = random.uniform(self.config.min_delay, self.config.max_delay)
+                self.log(f"[延时] 下次发送将在 {delay:.1f} 秒后", "INFO")
+                
+                # 每次循环检查停止标志
+                if self.stop_flag:
+                    break
+                
+                time.sleep(delay)
+            except Exception as e:
+                self.log(f"运行时异常: {str(e)}", "ERROR")
+                break
+        
+        self.log("聊天机器人已停止", "INFO")
 
 class DiscordBotGUI:
     def __init__(self):
@@ -346,8 +355,11 @@ class DiscordBotGUI:
         self.root.geometry("600x500")
         
         self.log_queue = LogQueue()
-        self.bots = []
+        self.bots = []  # 初始化为空列表
         self.config = DiscordConfig()
+        
+        # 根据 tokens.json 初始化 bots 列表
+        self.initialize_bots()
         
         # 创建选项卡
         self.notebook = ttk.Notebook(self.root)
@@ -360,6 +372,14 @@ class DiscordBotGUI:
         
         # 启动日志更新
         self.update_logs()  # 在初始化时就开始更新日志
+    
+    def initialize_bots(self):
+        """根据 tokens.json 初始化 bots 列表"""
+        for index, token in enumerate(self.config.tokens["tokens"]):
+            # 仅初始化，不启动
+            bot = DiscordSender(self.config, self.log_queue, token, index + 1)
+            self.bots.append(bot)
+        print(f"初始化 bots 列表: {self.bots}")
     
     def setup_main_page(self):
         main_frame = ttk.Frame(self.notebook)
@@ -374,8 +394,11 @@ class DiscordBotGUI:
         control_frame = ttk.Frame(main_frame)
         control_frame.pack(fill='x', padx=5, pady=5)
         
-        ttk.Button(control_frame, text="启动所有", command=self.start_bots).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="停止所有", command=self.stop_bots).pack(side=tk.LEFT, padx=5)
+        self.start_button = ttk.Button(control_frame, text="启动所有", command=self.start_bots)
+        self.start_button.pack(side=tk.LEFT, padx=5)
+        
+        self.stop_button = ttk.Button(control_frame, text="停止所有", command=self.stop_bots, state='disabled')
+        self.stop_button.pack(side=tk.LEFT, padx=5)
     
     def setup_settings_page(self):
         settings_frame = ttk.Frame(self.notebook)
@@ -458,6 +481,13 @@ class DiscordBotGUI:
                 
                 # 启动新添加的Token对应的机器人
                 self.start_bot(token, len(self.config.tokens["tokens"]))
+                
+                # 更新按钮状态
+                self.start_button.config(state='disabled', text="运行中")
+                self.stop_button.config(state='normal')
+                
+                # 关闭对话框
+                dialog.destroy()
         
         ttk.Button(dialog, text="确定", command=submit).pack(pady=10)
     
@@ -466,17 +496,19 @@ class DiscordBotGUI:
         if selection:
             index = selection[0]
             
-            # 停止与该Token相关的机器人
-            bot, thread = self.bots[index]
-            bot.stop_flag = True
-            self.log_queue.write(f"机器人 {index + 1} 已停止", "INFO")
-            self.bots.pop(index)
+            if index < len(self.bots):  # 检查索引是否有效
+                # 停止与该Token相关的机器人
+                bot = self.bots[index]
+                self.log_queue.write(f"正在停止bot: {bot.token[:20]}...", "INFO")
+                bot.stop_flag = True
+                self.bots.pop(index)
             
             # 删除Token
-            self.config.tokens["tokens"].pop(index)
-            with open('tokens.json', 'w', encoding='utf-8') as f:
-                json.dump(self.config.tokens, f)
-            self.refresh_token_list()
+            if index < len(self.config.tokens["tokens"]):  # 再次检查索引
+                self.config.tokens["tokens"].pop(index)
+                with open('tokens.json', 'w', encoding='utf-8') as f:
+                    json.dump(self.config.tokens, f)
+                self.refresh_token_list()
     
     def save_settings(self):
         for key, var in self.setting_vars.items():
@@ -493,26 +525,30 @@ class DiscordBotGUI:
         if not self.config.tokens["tokens"]:
             messagebox.showwarning("警告", "请先添加Token")
             return
-            
-        for index, token in enumerate(self.config.tokens["tokens"]):
-            bot = DiscordSender(self.config, self.log_queue, token, index + 1)  # 传递Token编号
-            
-            # 固定延时1秒
-            time.sleep(1.4)
-            
+        
+        # 重置每个机器人的 stop_flag
+        for bot in self.bots:
+            bot.stop_flag = False
+        
+        self.start_button.config(state='disabled', text="运行中")
+        self.stop_button.config(state='normal')
+        
+        for bot in self.bots:
             thread = threading.Thread(target=bot.run)
             thread.daemon = True
             thread.start()
-            self.bots.append((bot, thread))
         
         self.log_queue.write("所有机器人已启动", "SUCCESS")
     
     def stop_bots(self):
-        for bot, _ in self.bots:
+        for bot in self.bots:
             self.log_queue.write(f"正在停止bot: {bot.token[:20]}...", "INFO")
-            bot.stop_flag = True
-        self.bots.clear()
+            bot.stop_flag = True  # 设置停止标志
+        # 不清空 self.bots 列表
         self.log_queue.write("所有bot已停止", "SUCCESS")
+        
+        self.start_button.config(state='normal', text="启动所有")
+        self.stop_button.config(state='disabled')
     
     def update_logs(self):
         """更新日志显示"""
@@ -529,12 +565,11 @@ class DiscordBotGUI:
         self.root.mainloop()
 
     def start_bot(self, token, token_index):
-        """启动单个机器人"""
         bot = DiscordSender(self.config, self.log_queue, token, token_index)
         thread = threading.Thread(target=bot.run)
         thread.daemon = True
         thread.start()
-        self.bots.append((bot, thread))
+        self.bots.append(bot)  # 只添加bot对象
         self.log_queue.write(f"机器人 {token_index} 已启动", "SUCCESS")
 
 if __name__ == "__main__":
