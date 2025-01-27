@@ -15,6 +15,7 @@ import json
 from datetime import datetime, time as dt_time
 import tkinter.messagebox as messagebox
 import threading
+import ttkbootstrap as tb
 
 # 初始化颜色输出
 init(autoreset=True)
@@ -348,11 +349,11 @@ class DiscordSender:
         
         self.log("聊天机器人已停止", "INFO")
 
-class DiscordBotGUI:
+class ModernDiscordBotGUI:
     def __init__(self):
-        self.root = tk.Tk()
+        self.root = tb.Window(themename="flatly")  # 使用ttkbootstrap的flatly主题
         self.root.title("DC-AI-BOT - by Thread")
-        self.root.geometry("600x500")
+        self.root.geometry("700x500")
         
         self.log_queue = LogQueue()
         self.bots = []  # 初始化为空列表
@@ -363,7 +364,7 @@ class DiscordBotGUI:
         
         # 创建选项卡
         self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(expand=True, fill='both', padx=5, pady=5)
+        self.notebook.pack(expand=True, fill='both', padx=10, pady=10)
         
         # 创建主页、设置页和Token管理页
         self.setup_main_page()
@@ -386,25 +387,24 @@ class DiscordBotGUI:
         self.notebook.add(main_frame, text='运行日志')
         
         # 日志显示区域
-        self.log_text = scrolledtext.ScrolledText(main_frame, height=30)
-        self.log_text.pack(expand=True, fill='both', padx=5, pady=5)
+        self.log_text = scrolledtext.ScrolledText(main_frame, height=20, font=("Sans-serif", 8), bg="#f5f5f5", fg="#333333", insertbackground="black")
+        self.log_text.pack(expand=True, fill='both', padx=10, pady=10)
         self.log_text.config(state='disabled')  # 设置为只读
         
         # 控制按钮
         control_frame = ttk.Frame(main_frame)
-        control_frame.pack(fill='x', padx=5, pady=5)
+        control_frame.pack(fill='x', padx=10, pady=10)
         
-        self.start_button = ttk.Button(control_frame, text="启动所有", command=self.start_bots)
+        self.start_button = tb.Button(control_frame, text="启动所有", command=self.start_bots, bootstyle="success-outline")
         self.start_button.pack(side=tk.LEFT, padx=5)
         
-        self.stop_button = ttk.Button(control_frame, text="停止所有", command=self.stop_bots, state='disabled')
+        self.stop_button = tb.Button(control_frame, text="停止所有", command=self.stop_bots, state='disabled', bootstyle="danger-outline")
         self.stop_button.pack(side=tk.LEFT, padx=5)
     
     def setup_settings_page(self):
         settings_frame = ttk.Frame(self.notebook)
         self.notebook.add(settings_frame, text='设置')
         
-        # 创建设置项
         settings = [
             ("DeepSeek Key:", "deepseek_api_key"),
             ("DC频道 ID:", "channelid"),
@@ -414,21 +414,19 @@ class DiscordBotGUI:
         
         self.setting_vars = {}
         for i, (label, key) in enumerate(settings):
-            ttk.Label(settings_frame, text=label).grid(row=i, column=0, padx=10, pady=10, sticky='e')
+            ttk.Label(settings_frame, text=label, font=("Sans-serif", 10), foreground="#333333").grid(row=i, column=0, padx=10, pady=10, sticky='e')
             var = tk.StringVar(value=self.config.config.get('SETTINGS', key, fallback=''))
             self.setting_vars[key] = var
-            ttk.Entry(settings_frame, textvariable=var, width=50).grid(row=i, column=1, padx=5, pady=5, sticky='ew')
+            tb.Entry(settings_frame, textvariable=var, width=50, bootstyle="info").grid(row=i, column=1, padx=5, pady=5, sticky='ew')
         
-        # 添加多行文本框用于额外Prompt
-        ttk.Label(settings_frame, text="额外 AI Prompt:").grid(row=len(settings), column=0, padx=10, pady=10, sticky='ne')
-        extra_prompt_text = tk.Text(settings_frame, height=10, width=50)
+        ttk.Label(settings_frame, text="额外 AI Prompt:", font=("Sans-serif", 10), foreground="#333333").grid(row=len(settings), column=0, padx=10, pady=10, sticky='ne')
+        extra_prompt_text = tk.Text(settings_frame, height=10, width=50, font=("Sans-serif", 10), bg="#f5f5f5", fg="#333333", insertbackground="black")
         extra_prompt_text.grid(row=len(settings), column=1, padx=5, pady=5, sticky='ew')
         extra_prompt_text.insert('1.0', self.config.config.get('SETTINGS', 'extra_prompt', fallback=''))
         
         def save_settings():
             for key, var in self.setting_vars.items():
                 self.config.config.set('SETTINGS', key, var.get())
-            # 保存多行文本框内容
             self.config.config.set('SETTINGS', 'extra_prompt', extra_prompt_text.get('1.0', 'end').strip())
             
             with open('config.ini', 'w', encoding='utf-8') as f:
@@ -437,39 +435,36 @@ class DiscordBotGUI:
             messagebox.showinfo("成功", "设置已保存")
             self.config = DiscordConfig()  # 重新加载配置
         
-        ttk.Button(settings_frame, text="保存设置", command=save_settings).grid(row=len(settings)+1, column=0, columnspan=3, pady=20)
+        tb.Button(settings_frame, text="保存设置", command=save_settings, bootstyle="primary-outline").grid(row=len(settings)+1, column=0, columnspan=3, pady=20)
         
     def setup_token_page(self):
         token_frame = ttk.Frame(self.notebook)
         self.notebook.add(token_frame, text='Token管理')
         
-        # 增加Listbox宽度
-        self.token_listbox = tk.Listbox(token_frame, height=20, width=50)
+        self.token_listbox = tk.Listbox(token_frame, height=20, width=50, font=("Sans-serif", 10), bg="#f5f5f5", fg="#333333", selectbackground="#007acc")
         self.token_listbox.pack(fill='both', expand=True, padx=10, pady=10)
         
-        # 刷新Token列表
         self.refresh_token_list()
         
-        # 控制按钮
         btn_frame = ttk.Frame(token_frame)
         btn_frame.pack(fill='x', padx=5, pady=5)
         
-        ttk.Button(btn_frame, text="添加Token", command=self.add_token).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="删除Token", command=self.delete_token).pack(side=tk.LEFT, padx=5)
+        tb.Button(btn_frame, text="添加Token", command=self.add_token, bootstyle="success-outline").pack(side=tk.LEFT, padx=5)
+        tb.Button(btn_frame, text="删除Token", command=self.delete_token, bootstyle="danger-outline").pack(side=tk.LEFT, padx=5)
     
     def refresh_token_list(self):
         self.token_listbox.delete(0, tk.END)
         for token in self.config.tokens["tokens"]:
-            self.token_listbox.insert(tk.END, token)  # 显示完整的Token
+            self.token_listbox.insert(tk.END, token)
     
     def add_token(self):
         dialog = tk.Toplevel(self.root)
         dialog.title("添加Token")
         dialog.geometry("400x150")
         
-        ttk.Label(dialog, text="请输入Token").pack(pady=10)
+        ttk.Label(dialog, text="请输入Token", font=("Sans-serif", 10), foreground="#333333").pack(pady=10)
         token_var = tk.StringVar()
-        ttk.Entry(dialog, textvariable=token_var, width=50).pack(pady=10)
+        tb.Entry(dialog, textvariable=token_var, width=50, bootstyle="info").pack(pady=10)
         
         def submit():
             token = token_var.get().strip()
@@ -479,54 +474,37 @@ class DiscordBotGUI:
                     json.dump(self.config.tokens, f)
                 self.refresh_token_list()
                 
-                # 启动新添加的Token对应的机器人
                 self.start_bot(token, len(self.config.tokens["tokens"]))
                 
-                # 更新按钮状态
                 self.start_button.config(state='disabled', text="运行中")
                 self.stop_button.config(state='normal')
                 
-                # 关闭对话框
                 dialog.destroy()
         
-        ttk.Button(dialog, text="确定", command=submit).pack(pady=10)
+        tb.Button(dialog, text="确定", command=submit, bootstyle="primary-outline").pack(pady=10)
     
     def delete_token(self):
         selection = self.token_listbox.curselection()
         if selection:
             index = selection[0]
             
-            if index < len(self.bots):  # 检查索引是否有效
-                # 停止与该Token相关的机器人
+            if index < len(self.bots):
                 bot = self.bots[index]
                 self.log_queue.write(f"正在停止bot: {bot.token[:20]}...", "INFO")
                 bot.stop_flag = True
                 self.bots.pop(index)
             
-            # 删除Token
-            if index < len(self.config.tokens["tokens"]):  # 再次检查索引
+            if index < len(self.config.tokens["tokens"]):
                 self.config.tokens["tokens"].pop(index)
                 with open('tokens.json', 'w', encoding='utf-8') as f:
                     json.dump(self.config.tokens, f)
                 self.refresh_token_list()
     
-    def save_settings(self):
-        for key, var in self.setting_vars.items():
-            self.config.config.set('SETTINGS', key, var.get())
-        
-        with open('config.ini', 'w', encoding='utf-8') as f:
-            self.config.config.write(f)
-        
-        messagebox.showinfo("成功", "设置已保存")
-        self.config = DiscordConfig()  # 重新加载配置
-
     def start_bots(self):
-        """启动所有机器人"""
         if not self.config.tokens["tokens"]:
             messagebox.showwarning("警告", "请先添加Token")
             return
         
-        # 重置每个机器人的 stop_flag
         for bot in self.bots:
             bot.stop_flag = False
         
@@ -543,22 +521,28 @@ class DiscordBotGUI:
     def stop_bots(self):
         for bot in self.bots:
             self.log_queue.write(f"正在停止bot: {bot.token[:20]}...", "INFO")
-            bot.stop_flag = True  # 设置停止标志
-        # 不清空 self.bots 列表
+            bot.stop_flag = True
         self.log_queue.write("所有bot已停止", "SUCCESS")
         
         self.start_button.config(state='normal', text="启动所有")
         self.stop_button.config(state='disabled')
     
     def update_logs(self):
-        """更新日志显示"""
+        max_length = 82  # 设置最大字符长度
+        
         while not self.log_queue.queue.empty():
             log = self.log_queue.queue.get()
-            self.log_text.config(state='normal')  # 临时允许编辑
-            self.log_text.insert(tk.END, 
-                f"[{log['timestamp']}] [{log['status']}] {log['message']}\n")
+            message = f"[{log['timestamp']}] [{log['status']}] {log['message']}"
+            
+            # 如果消息长度超过最大长度，则截断并添加省略号
+            if len(message) > max_length:
+                message = message[:max_length - 3] + "..."
+            
+            self.log_text.config(state='normal')
+            self.log_text.insert(tk.END, message + "\n")
             self.log_text.see(tk.END)
-            self.log_text.config(state='disabled')  # 恢复只读
+            self.log_text.config(state='disabled')
+        
         self.root.after(100, self.update_logs)
     
     def run(self):
@@ -569,12 +553,12 @@ class DiscordBotGUI:
         thread = threading.Thread(target=bot.run)
         thread.daemon = True
         thread.start()
-        self.bots.append(bot)  # 只添加bot对象
+        self.bots.append(bot)
         self.log_queue.write(f"机器人 {token_index} 已启动", "SUCCESS")
 
 if __name__ == "__main__":
     try:
-        gui = DiscordBotGUI()
+        gui = ModernDiscordBotGUI()
         gui.run()
     except Exception as e:
         print(f"发生错误: {e}")
