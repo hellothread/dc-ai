@@ -224,13 +224,13 @@ class DiscordSender:
 
     def process_with_deepseek(self, messages):
         try:
-            message_text = "\n".join([f"{msg['author']['username']}: {msg['content']}" for msg in messages if msg['content']])
+            # 仅提取消息内容，不包括用户名
+            message_text = "\n".join([msg['content'] for msg in messages if msg['content']])
             
-
             system_prompt = """你是一个真实的Web3社区活跃成员，性格设定如下：
 
 个人背景：
-- 25-35岁的年轻技术爱好者
+- 27岁的年轻技术爱好者
 - 对区块链和加密货币有深入了解
 - 经常活跃在Discord社区，熟悉社区文化
 
@@ -242,7 +242,7 @@ class DiscordSender:
 
 语言特点：
 - 英文回答
-- 偶尔表情符号和缩写
+- 少用表情符号和缩写
 - 回复简洁有力
 - 根据对话氛围快速调整语气
 
@@ -261,8 +261,12 @@ class DiscordSender:
 特殊术语使用：
 - gm/ser/lfg等社区用语要恰到好处
 - 不生搬硬套，要有语境
-- 体现对Web3文化的理解"""
+- 体现对Web3文化的理解
 
+生成指令：
+- 避免重复使用相同的短语
+- 尝试使用不同的表达方式
+- 提供多样化的回复示例"""
 
             # 获取外部额外的prompt
             extra_prompt = self.config.config.get('SETTINGS', 'extra_prompt', fallback='')
@@ -271,7 +275,6 @@ class DiscordSender:
             combined_prompt = f"""{system_prompt}
 
             {extra_prompt}"""
-
 
             response = self.deepseek_client.chat.completions.create(
                 model="deepseek-chat", 
