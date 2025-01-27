@@ -168,6 +168,7 @@ class DiscordSender:
     def send_message(self):
         """发送消息"""
         try:
+        
             content = random.choice(self.config.messages)
             payload = self._construct_payload(content)
             url = f"https://discord.com/api/v9/channels/{self.config.channel_id}/messages"
@@ -323,7 +324,11 @@ class DiscordSender:
 
     def run(self):
         self.log("聊天机器人启动", "SUCCESS")
+        #随机延时
+        delay = random.uniform(0, 5)
+        time.sleep(delay)
         
+
         while not self.stop_flag:
             try:
                 # 获取频道消息
@@ -380,7 +385,7 @@ class ModernDiscordBotGUI:
             # 仅初始化，不启动
             bot = DiscordSender(self.config, self.log_queue, token, index + 1)
             self.bots.append(bot)
-        print(f"初始化 bots 列表: {self.bots}")
+       
     
     def setup_main_page(self):
         main_frame = ttk.Frame(self.notebook)
@@ -540,6 +545,11 @@ class ModernDiscordBotGUI:
             
             self.log_text.config(state='normal')
             self.log_text.insert(tk.END, message + "\n")
+            
+            # 如果是INFO日志，添加一个额外的空行
+            if log['status'].strip() == "INFO":
+                self.log_text.insert(tk.END, "\n")
+            
             self.log_text.see(tk.END)
             self.log_text.config(state='disabled')
         
