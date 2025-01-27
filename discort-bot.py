@@ -373,8 +373,9 @@ class ModernDiscordBotGUI:
         
         # 创建主页、设置页和Token管理页
         self.setup_main_page()
-        self.setup_settings_page()
         self.setup_token_page()
+        self.setup_settings_page()
+        
         
         # 启动日志更新
         self.update_logs()  # 在初始化时就开始更新日志
@@ -444,7 +445,7 @@ class ModernDiscordBotGUI:
         
     def setup_token_page(self):
         token_frame = ttk.Frame(self.notebook)
-        self.notebook.add(token_frame, text='Token管理')
+        self.notebook.add(token_frame, text='DC_AUTH')
         
         self.token_listbox = tk.Listbox(token_frame, height=20, width=50, font=("Sans-serif", 10), bg="#f5f5f5", fg="#333333", selectbackground="#007acc")
         self.token_listbox.pack(fill='both', expand=True, padx=10, pady=10)
@@ -454,8 +455,8 @@ class ModernDiscordBotGUI:
         btn_frame = ttk.Frame(token_frame)
         btn_frame.pack(fill='x', padx=5, pady=5)
         
-        tb.Button(btn_frame, text="添加Token", command=self.add_token, bootstyle="success-outline").pack(side=tk.LEFT, padx=5)
-        tb.Button(btn_frame, text="删除Token", command=self.delete_token, bootstyle="danger-outline").pack(side=tk.LEFT, padx=5)
+        tb.Button(btn_frame, text="添加AUTH", command=self.add_token, bootstyle="success-outline").pack(side=tk.LEFT, padx=5)
+        tb.Button(btn_frame, text="删除AUTH", command=self.delete_token, bootstyle="danger-outline").pack(side=tk.LEFT, padx=5)
     
     def refresh_token_list(self):
         self.token_listbox.delete(0, tk.END)
@@ -465,7 +466,7 @@ class ModernDiscordBotGUI:
     def add_token(self):
         dialog = tk.Toplevel(self.root)
         dialog.title("添加Token")
-        dialog.geometry("400x150")
+        dialog.geometry("450x150")
         
         ttk.Label(dialog, text="请输入Token", font=("Sans-serif", 10), foreground="#333333").pack(pady=10)
         token_var = tk.StringVar()
