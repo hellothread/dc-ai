@@ -465,10 +465,10 @@ class ModernDiscordBotGUI:
     
     def add_token(self):
         dialog = tk.Toplevel(self.root)
-        dialog.title("添加Token")
-        dialog.geometry("450x150")
+        dialog.title("添加AUTH")
+        dialog.geometry("500x150")
         
-        ttk.Label(dialog, text="请输入Token", font=("Sans-serif", 10), foreground="#333333").pack(pady=10)
+        ttk.Label(dialog, text="请输入AUTH", font=("Sans-serif", 10), foreground="#333333").pack(pady=10)
         token_var = tk.StringVar()
         tb.Entry(dialog, textvariable=token_var, width=50, bootstyle="info").pack(pady=10)
         
@@ -487,7 +487,7 @@ class ModernDiscordBotGUI:
                 
                 dialog.destroy()
         
-        tb.Button(dialog, text="确定", command=submit, bootstyle="primary-outline").pack(pady=10)
+        tb.Button(dialog, text="确定", command=submit, bootstyle="primary-outline", width=10).pack(pady=10, padx=20)
     
     def delete_token(self):
         selection = self.token_listbox.curselection()
