@@ -33,9 +33,9 @@ class DiscordConfig:
         self._load_config()
         
         # 从配置文件读取参数
-        self.channel_id = "984941796272521229"
-        self.min_delay = 60
-        self.max_delay = 100
+        self.channel_id = "1332595025422319714"
+        self.min_delay = 6
+        self.max_delay = 10
         self.deepseek_api_key = self.config.get('SETTINGS', 'deepseek_api_key', fallback='')
 
         # 其他凭证读取
