@@ -1,4 +1,4 @@
-from PyQt5 import QtWidgets
+from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QLineEdit, QListWidget
 from config import DiscordConfig  # 导入 DiscordConfig
 from utils import log_message  # 导入 log_message
@@ -11,6 +11,7 @@ class MainPage(QtWidgets.QWidget):
         self.stop_bots_callback = stop_bots_callback
         
         self.init_ui()
+        self.start_log_update()  # 启动日志更新
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -32,24 +33,16 @@ class MainPage(QtWidgets.QWidget):
         layout.addLayout(control_frame)
         self.setLayout(layout)
 
+    def start_log_update(self):
+        """定期更新日志显示"""
+        self.update_logs()
+        QtCore.QTimer.singleShot(1000, self.start_log_update)  # 每秒更新一次
+
     def update_logs(self):
-        max_length = 82  # 设置最大字符长度
-        
-        while not self.log_queue.queue.empty():
-            log = self.log_queue.queue.get()
+        logs = self.log_queue.get_logs()
+        for log in logs:
             message = f"[{log['timestamp']}] [{log['status']}] {log['message']}"
-            
-            # 如果消息长度超过最大长度，则截断并添加省略号
-            if len(message) > max_length:
-                message = message[:max_length - 3] + "..."
-            
-            self.log_text.setPlainText(self.log_text.toPlainText() + message + "\n")
-            
-            # 如果是INFO日志，添加一个额外的空行
-            if log['status'].strip() == "INFO":
-                self.log_text.setPlainText(self.log_text.toPlainText() + "\n")
-            
-            self.log_text.verticalScrollBar().setValue(self.log_text.verticalScrollBar().maximum())
+            self.log_text.append(message)  # 使用 append 方法添加新日志
 
 class SettingsPage(QtWidgets.QWidget):
     def __init__(self, config):

@@ -15,3 +15,10 @@ class LogQueue:
             "status": formatted_status,
             "message": message
         }) 
+
+    def get_logs(self):
+        """获取并清空日志队列"""
+        logs = []
+        while not self.queue.empty():
+            logs.append(self.queue.get())
+        return logs 

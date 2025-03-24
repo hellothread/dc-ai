@@ -159,4 +159,43 @@ class DiscordSender:
             self.log(f"AI处理异常: {str(e)}", "ERROR")
             return None
 
+    def send_ai_message(self, content):
+        """发送AI生成的消息"""
+        payload = self._construct_payload(content)
+        url = f"https://discord.com/api/v9/channels/{self.config.channel_id}/messages"
+
+        try:
+            response = requests.post(
+                url,
+                json=payload,
+                headers=self.headers,
+                proxies=self.config.proxy,
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                self.log(f"[回复] {content}", "SUCCESS")
+                return True
+            elif response.status_code == 429:
+                retry_after = response.json().get('retry_after', 30)
+                self.log(f"触发速率限制，等待 {retry_after} 秒", "WARNING")
+                time.sleep(retry_after)
+                # 重试发送消息
+                return self.send_ai_message(content)
+            else:
+                self.log(f"AI回复发送失败 [{response.status_code}]: {response.text}", "ERROR")
+                return False
+        except Exception as e:
+            self.log(f"发送异常: {str(e)}", "ERROR")
+            return False
+
+    def _construct_payload(self, content):
+        """构建消息体"""
+        return {
+            "content": content,
+            "nonce": generate_nonce(),
+            "tts": False,
+            "flags": 0
+        }
+
     # 其他方法保持不变... 
