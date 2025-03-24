@@ -16,6 +16,8 @@ from datetime import datetime, time as dt_time
 import tkinter.messagebox as messagebox
 import threading
 import ttkbootstrap as tb
+from PyQt5 import QtWidgets, QtCore
+from PyQt5.QtWidgets import QMessageBox, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QLineEdit, QListWidget, QTabWidget
 
 # 初始化颜色输出
 init(autoreset=True)
@@ -357,12 +359,133 @@ class DiscordSender:
         
         self.log("聊天机器人已停止", "INFO")
 
+class MainPage(QtWidgets.QWidget):
+    def __init__(self, log_queue, start_bots_callback, stop_bots_callback):
+        super().__init__()
+        self.log_queue = log_queue
+        self.start_bots_callback = start_bots_callback
+        self.stop_bots_callback = stop_bots_callback
+        
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        self.log_text = QTextEdit()
+        self.log_text.setReadOnly(True)
+        layout.addWidget(self.log_text)
+
+        control_frame = QHBoxLayout()
+        self.start_button = QPushButton("启动所有")
+        self.start_button.clicked.connect(self.start_bots_callback)
+        control_frame.addWidget(self.start_button)
+
+        self.stop_button = QPushButton("停止所有")
+        self.stop_button.clicked.connect(self.stop_bots_callback)
+        self.stop_button.setDisabled(True)
+        control_frame.addWidget(self.stop_button)
+
+        layout.addLayout(control_frame)
+        self.setLayout(layout)
+
+    def update_logs(self):
+        max_length = 82  # 设置最大字符长度
+        
+        while not self.log_queue.queue.empty():
+            log = self.log_queue.queue.get()
+            message = f"[{log['timestamp']}] [{log['status']}] {log['message']}"
+            
+            # 如果消息长度超过最大长度，则截断并添加省略号
+            if len(message) > max_length:
+                message = message[:max_length - 3] + "..."
+            
+            self.log_text.setPlainText(self.log_text.toPlainText() + message + "\n")
+            
+            # 如果是INFO日志，添加一个额外的空行
+            if log['status'].strip() == "INFO":
+                self.log_text.setPlainText(self.log_text.toPlainText() + "\n")
+            
+            self.log_text.verticalScrollBar().setValue(self.log_text.verticalScrollBar().maximum())
+
+class SettingsPage(QtWidgets.QWidget):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        settings = [
+            ("DeepSeek Key:", "deepseek_api_key"),
+            ("DC频道 ID:", "channelid"),
+            ("最小延迟(秒):", "mindelay"),
+            ("最大延迟(秒):", "maxdelay")
+        ]
+        
+        self.setting_vars = {}
+        for label, key in settings:
+            h_layout = QHBoxLayout()
+            h_layout.addWidget(QLabel(label))
+            var = str(self.config.config.get('SETTINGS', key, fallback=''))
+            self.setting_vars[key] = var
+            line_edit = QLineEdit(var)
+            h_layout.addWidget(line_edit)
+            layout.addLayout(h_layout)
+        
+        extra_prompt_text = QTextEdit()
+        extra_prompt_text.setPlainText(self.config.config.get('SETTINGS', 'extra_prompt', fallback=''))
+        layout.addWidget(extra_prompt_text)
+
+        def save_settings():
+            for key, var in self.setting_vars.items():
+                self.config.config.set('SETTINGS', key, var)
+            self.config.config.set('SETTINGS', 'extra_prompt', extra_prompt_text.toPlainText().strip())
+            
+            with open('config.ini', 'w', encoding='utf-8') as f:
+                self.config.config.write(f)
+            
+            QMessageBox.information(self, "成功", "设置已保存")
+            self.config = DiscordConfig()  # 重新加载配置
+
+        btn_layout = QHBoxLayout()
+        save_button = QPushButton("保存设置")
+        save_button.clicked.connect(save_settings)
+        btn_layout.addWidget(save_button)
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
+
+        self.setLayout(layout)
+
+class TokenPage(QtWidgets.QWidget):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        self.token_listbox = QListWidget()
+        self.token_listbox.addItems(self.config.tokens["tokens"])
+        layout.addWidget(self.token_listbox)
+        
+        btn_frame = QHBoxLayout()
+        add_button = QPushButton("添加AUTH")
+        btn_frame.addWidget(add_button)
+        delete_button = QPushButton("删除AUTH")
+        btn_frame.addWidget(delete_button)
+        layout.addLayout(btn_frame)
+
+        self.setLayout(layout)
+
 class ModernDiscordBotGUI:
     def __init__(self):
-        self.root = tb.Window(themename="flatly")  # 使用ttkbootstrap的flatly主题
-        self.root.title("DC-AI-BOT - by Thread")
-        self.root.geometry("700x500")
-        
+        self.app = QtWidgets.QApplication([])  # 初始化 PyQt5 应用
+        self.window = QtWidgets.QWidget()
+        self.window.setWindowTitle("DC-AI-BOT - by Thread")
+        self.window.setGeometry(100, 100, 700, 500)
+
         self.log_queue = LogQueue()
         self.bots = []  # 初始化为空列表
         self.config = DiscordConfig()
@@ -371,14 +494,17 @@ class ModernDiscordBotGUI:
         self.initialize_bots()
         
         # 创建选项卡
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(expand=True, fill='both', padx=10, pady=10)
+        self.notebook = QTabWidget()
+        self.main_page = MainPage(self.log_queue, self.start_bots, self.stop_bots)
+        self.notebook.addTab(self.main_page, '运行日志')
+        self.settings_page = SettingsPage(self.config)
+        self.notebook.addTab(self.settings_page, '设置')
+        self.token_page = TokenPage(self.config)
+        self.notebook.addTab(self.token_page, 'DC_AUTH')
         
-        # 创建主页、设置页和Token管理页
-        self.setup_main_page()
-        self.setup_token_page()
-        self.setup_settings_page()
-        
+        layout = QVBoxLayout()
+        layout.addWidget(self.notebook)
+        self.window.setLayout(layout)
         
         # 启动日志更新
         self.update_logs()  # 在初始化时就开始更新日志
@@ -389,136 +515,17 @@ class ModernDiscordBotGUI:
             # 仅初始化，不启动
             bot = DiscordSender(self.config, self.log_queue, token, index + 1)
             self.bots.append(bot)
-       
-    
-    def setup_main_page(self):
-        main_frame = ttk.Frame(self.notebook)
-        self.notebook.add(main_frame, text='运行日志')
-        
-        # 日志显示区域
-        self.log_text = scrolledtext.ScrolledText(main_frame, height=20, font=("Sans-serif", 8), bg="#f5f5f5", fg="#333333", insertbackground="black")
-        self.log_text.pack(expand=True, fill='both', padx=10, pady=10)
-        self.log_text.config(state='disabled')  # 设置为只读
-        
-        # 控制按钮
-        control_frame = ttk.Frame(main_frame)
-        control_frame.pack(fill='x', padx=10, pady=10)
-        
-        self.start_button = tb.Button(control_frame, text="启动所有", command=self.start_bots, bootstyle="success-outline")
-        self.start_button.pack(side=tk.LEFT, padx=5)
-        
-        self.stop_button = tb.Button(control_frame, text="停止所有", command=self.stop_bots, state='disabled', bootstyle="danger-outline")
-        self.stop_button.pack(side=tk.LEFT, padx=5)
-    
-    def setup_settings_page(self):
-        settings_frame = ttk.Frame(self.notebook)
-        self.notebook.add(settings_frame, text='设置')
-        
-        settings = [
-            ("DeepSeek Key:", "deepseek_api_key"),
-            ("DC频道 ID:", "channelid"),
-            ("最小延迟(秒):", "mindelay"),
-            ("最大延迟(秒):", "maxdelay")
-        ]
-        
-        self.setting_vars = {}
-        for i, (label, key) in enumerate(settings):
-            ttk.Label(settings_frame, text=label, font=("Sans-serif", 10), foreground="#333333").grid(row=i, column=0, padx=10, pady=10, sticky='e')
-            var = tk.StringVar(value=self.config.config.get('SETTINGS', key, fallback=''))
-            self.setting_vars[key] = var
-            tb.Entry(settings_frame, textvariable=var, width=50, bootstyle="info").grid(row=i, column=1, padx=5, pady=5, sticky='ew')
-        
-        ttk.Label(settings_frame, text="额外 AI Prompt:", font=("Sans-serif", 10), foreground="#333333").grid(row=len(settings), column=0, padx=10, pady=10, sticky='ne')
-        extra_prompt_text = tk.Text(settings_frame, height=10, width=50, font=("Sans-serif", 10), bg="#f5f5f5", fg="#333333", insertbackground="black")
-        extra_prompt_text.grid(row=len(settings), column=1, padx=5, pady=5, sticky='ew')
-        extra_prompt_text.insert('1.0', self.config.config.get('SETTINGS', 'extra_prompt', fallback=''))
-        
-        def save_settings():
-            for key, var in self.setting_vars.items():
-                self.config.config.set('SETTINGS', key, var.get())
-            self.config.config.set('SETTINGS', 'extra_prompt', extra_prompt_text.get('1.0', 'end').strip())
-            
-            with open('config.ini', 'w', encoding='utf-8') as f:
-                self.config.config.write(f)
-            
-            messagebox.showinfo("成功", "设置已保存")
-            self.config = DiscordConfig()  # 重新加载配置
-        
-        tb.Button(settings_frame, text="保存设置", command=save_settings, bootstyle="primary-outline").grid(row=len(settings)+1, column=0, columnspan=3, pady=20)
-        
-    def setup_token_page(self):
-        token_frame = ttk.Frame(self.notebook)
-        self.notebook.add(token_frame, text='DC_AUTH')
-        
-        self.token_listbox = tk.Listbox(token_frame, height=20, width=50, font=("Sans-serif", 10), bg="#f5f5f5", fg="#333333", selectbackground="#007acc")
-        self.token_listbox.pack(fill='both', expand=True, padx=10, pady=10)
-        
-        self.refresh_token_list()
-        
-        btn_frame = ttk.Frame(token_frame)
-        btn_frame.pack(fill='x', padx=5, pady=5)
-        
-        tb.Button(btn_frame, text="添加AUTH", command=self.add_token, bootstyle="success-outline").pack(side=tk.LEFT, padx=5)
-        tb.Button(btn_frame, text="删除AUTH", command=self.delete_token, bootstyle="danger-outline").pack(side=tk.LEFT, padx=5)
-    
-    def refresh_token_list(self):
-        self.token_listbox.delete(0, tk.END)
-        for token in self.config.tokens["tokens"]:
-            self.token_listbox.insert(tk.END, token)
-    
-    def add_token(self):
-        dialog = tk.Toplevel(self.root)
-        dialog.title("添加AUTH")
-        dialog.geometry("500x150")
-        
-        ttk.Label(dialog, text="请输入AUTH", font=("Sans-serif", 10), foreground="#333333").pack(pady=10)
-        token_var = tk.StringVar()
-        tb.Entry(dialog, textvariable=token_var, width=50, bootstyle="info").pack(pady=10)
-        
-        def submit():
-            token = token_var.get().strip()
-            if token:
-                self.config.tokens["tokens"].append(token)
-                with open('tokens.json', 'w', encoding='utf-8') as f:
-                    json.dump(self.config.tokens, f)
-                self.refresh_token_list()
-                
-                self.start_bot(token, len(self.config.tokens["tokens"]))
-                
-                self.start_button.config(state='disabled', text="运行中")
-                self.stop_button.config(state='normal')
-                
-                dialog.destroy()
-        
-        tb.Button(dialog, text="确定", command=submit, bootstyle="primary-outline", width=10).pack(pady=10, padx=20)
-    
-    def delete_token(self):
-        selection = self.token_listbox.curselection()
-        if selection:
-            index = selection[0]
-            
-            if index < len(self.bots):
-                bot = self.bots[index]
-                self.log_queue.write(f"正在停止bot: {bot.token[:20]}...", "INFO")
-                bot.stop_flag = True
-                self.bots.pop(index)
-            
-            if index < len(self.config.tokens["tokens"]):
-                self.config.tokens["tokens"].pop(index)
-                with open('tokens.json', 'w', encoding='utf-8') as f:
-                    json.dump(self.config.tokens, f)
-                self.refresh_token_list()
-    
+
     def start_bots(self):
         if not self.config.tokens["tokens"]:
-            messagebox.showwarning("警告", "请先添加Token")
+            QMessageBox.warning(self.window, "警告", "请先添加Token")
             return
         
         for bot in self.bots:
             bot.stop_flag = False
         
-        self.start_button.config(state='disabled', text="运行中")
-        self.stop_button.config(state='normal')
+        self.main_page.start_button.setDisabled(True)
+        self.main_page.stop_button.setEnabled(True)
         
         for bot in self.bots:
             thread = threading.Thread(target=bot.run)
@@ -533,42 +540,15 @@ class ModernDiscordBotGUI:
             bot.stop_flag = True
         self.log_queue.write("所有bot已停止", "SUCCESS")
         
-        self.start_button.config(state='normal', text="启动所有")
-        self.stop_button.config(state='disabled')
-    
-    def update_logs(self):
-        max_length = 82  # 设置最大字符长度
-        
-        while not self.log_queue.queue.empty():
-            log = self.log_queue.queue.get()
-            message = f"[{log['timestamp']}] [{log['status']}] {log['message']}"
-            
-            # 如果消息长度超过最大长度，则截断并添加省略号
-            if len(message) > max_length:
-                message = message[:max_length - 3] + "..."
-            
-            self.log_text.config(state='normal')
-            self.log_text.insert(tk.END, message + "\n")
-            
-            # 如果是INFO日志，添加一个额外的空行
-            if log['status'].strip() == "INFO":
-                self.log_text.insert(tk.END, "\n")
-            
-            self.log_text.see(tk.END)
-            self.log_text.config(state='disabled')
-        
-        self.root.after(100, self.update_logs)
-    
-    def run(self):
-        self.root.mainloop()
+        self.main_page.start_button.setEnabled(True)
+        self.main_page.stop_button.setDisabled(True)
 
-    def start_bot(self, token, token_index):
-        bot = DiscordSender(self.config, self.log_queue, token, token_index)
-        thread = threading.Thread(target=bot.run)
-        thread.daemon = True
-        thread.start()
-        self.bots.append(bot)
-        self.log_queue.write(f"机器人 {token_index} 已启动", "SUCCESS")
+    def update_logs(self):
+        self.main_page.update_logs()  # 调用主页面的更新日志方法
+
+    def run(self):
+        self.window.show()
+        self.app.exec_()  # 启动 PyQt5 应用
 
 if __name__ == "__main__":
     try:

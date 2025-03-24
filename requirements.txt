@@ -2,4 +2,4 @@ requests
 colorama
 pyfiglet
 openai
-ttkbootstrap
+PyQt5
