@@ -53,8 +53,8 @@ class DiscordSender:
 
         while not self.stop_flag:
             try:
-                # 获取频道消息
-                messages = self.get_channel_messages(limit=1)
+                # 获取最近10条消息
+                messages = self.get_channel_messages(limit=10)
                 if messages:
                     # 使用DeepSeek生成回复
                     ai_reply = self.process_with_deepseek(messages)
@@ -76,11 +76,11 @@ class DiscordSender:
         
         self.log("聊天机器人已停止", "INFO")
 
-    def get_channel_messages(self, limit=1):
+    def get_channel_messages(self, limit=10):
         """获取频道消息历史"""
         try:
             url = f"https://discord.com/api/v9/channels/{self.config.channel_id}/messages"
-            params = {'limit': limit}
+            params = {'limit': limit}  # 获取最近的 limit 条消息
             
             response = requests.get(
                 url,
@@ -92,9 +92,6 @@ class DiscordSender:
 
             if response.status_code == 200:
                 messages = response.json()
-                for msg in messages:
-                    content = msg.get('content', '无内容')
-                    self.log(f"[获取] {content}", "SUCCESS")
                 return messages
             else:
                 self.log(f"获取消息失败 [{response.status_code}]: {response.text}", "ERROR")
