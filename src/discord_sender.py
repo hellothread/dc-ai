@@ -5,11 +5,12 @@ from openai import OpenAI  # 确保导入 OpenAI
 from utils import generate_nonce, log_message  # 导入 log_message
 
 class DiscordSender:
-    def __init__(self, config, log_queue, token, token_index):
+    def __init__(self, config, log_queue, token, token_index, proxy=None):
         self.config = config
         self.log_queue = log_queue
         self.token = token
         self.token_index = token_index  # 添加Token编号
+        self.proxy = proxy  # 添加代理设置
         self.headers = {
             "Authorization": self.token,
             "Content-Type": "application/json"
@@ -29,6 +30,20 @@ class DiscordSender:
             self.log_queue.write(f"[账号{self.token_index}] {message}", status)
         
         self.log = custom_log  # 使用自定义日志方法
+
+    def get_proxy_dict(self):
+        """获取代理设置"""
+        if not self.proxy:
+            return None
+        try:
+            ip, port, user, password = self.proxy.split(':')
+            return {
+                'http': f'http://{user}:{password}@{ip}:{port}',
+                'https': f'http://{user}:{password}@{ip}:{port}'
+            }
+        except Exception as e:
+            self.log(f"代理格式错误: {str(e)}", "ERROR")
+            return None
 
     def run(self):
         self.log("聊天机器人启动", "SUCCESS")
@@ -71,7 +86,7 @@ class DiscordSender:
                 url,
                 headers=self.headers,
                 params=params,
-                proxies=self.config.proxy,
+                proxies=self.get_proxy_dict(),
                 timeout=30
             )
 
@@ -124,11 +139,6 @@ class DiscordSender:
 - 体现个人态度和观点
 - 增加互动感和社区归属感
 
-特殊术语使用：
-- gm/ser/lfg等社区用语要恰到好处
-- 不生搬硬套，要有语境
-- 体现对Web3文化的理解
-
 生成指令：
 - 避免重复使用相同的短语
 - 尝试使用不同的表达方式
@@ -169,7 +179,7 @@ class DiscordSender:
                 url,
                 json=payload,
                 headers=self.headers,
-                proxies=self.config.proxy,
+                proxies=self.get_proxy_dict(),
                 timeout=30
             )
 

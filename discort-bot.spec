@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='discort-bot',
+    name='DC_AI_BOT',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

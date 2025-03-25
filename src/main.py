@@ -17,7 +17,7 @@ class ModernDiscordBotGUI:
         self.bots = []  # 初始化为空列表
         self.config = DiscordConfig()
         
-        # 根据 tokens.json 初始化 bots 列表
+        # 根据 tokens.txt 和 proxy.txt 初始化 bots 列表
         self.initialize_bots()
         
         # 创建选项卡
@@ -39,14 +39,47 @@ class ModernDiscordBotGUI:
         self.update_logs()  # 在初始化时就开始更新日志
     
     def initialize_bots(self):
-        """根据 tokens.json 初始化 bots 列表"""
-        for index, token in enumerate(self.config.tokens["tokens"]):
-            # 仅初始化，不启动
-            bot = DiscordSender(self.config, self.log_queue, token, index + 1)
-            self.bots.append(bot)
+        """根据 tokens.txt 和 proxy.txt 初始化 bots 列表"""
+        try:
+            # 读取tokens
+            tokens = []
+            try:
+                with open('tokens.txt', 'r', encoding='utf-8') as f:
+                    for line in f:
+                        name, token = line.strip().split(',')
+                        tokens.append(token)
+            except FileNotFoundError:
+                pass
+
+            # 读取proxies
+            proxies = []
+            try:
+                with open('proxy.txt', 'r', encoding='utf-8') as f:
+                    for line in f:
+                        proxy = line.strip()
+                        if proxy:
+                            proxies.append(proxy)
+            except FileNotFoundError:
+                pass
+
+            # 确保每个token都有对应的proxy
+            for i, token in enumerate(tokens):
+                # 如果proxy数量不足，使用最后一个proxy
+                proxy = proxies[i] if i < len(proxies) else proxies[-1] if proxies else None
+                bot = DiscordSender(self.config, self.log_queue, token, i + 1, proxy)
+                self.bots.append(bot)
+
+        except Exception as e:
+            self.log_queue.write(f"初始化bots时发生错误: {str(e)}", "ERROR")
 
     def start_bots(self):
-        if not self.config.tokens["tokens"]:
+        # 检查是否有token
+        try:
+            with open('tokens.txt', 'r', encoding='utf-8') as f:
+                if not f.read().strip():
+                    QtWidgets.QMessageBox.warning(self.window, "警告", "请先添加Token")
+                    return
+        except FileNotFoundError:
             QtWidgets.QMessageBox.warning(self.window, "警告", "请先添加Token")
             return
         
