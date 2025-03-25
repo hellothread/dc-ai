@@ -1,7 +1,7 @@
 import sys
 import threading  # 确保导入 threading
 from PyQt5 import QtWidgets
-from pages import MainPage, SettingsPage, TokenPage
+from pages import MainPage, SettingsPage, TokenPage, ProxyPage
 from discord_sender import DiscordSender
 from log_queue import LogQueue
 from config import DiscordConfig
@@ -28,6 +28,8 @@ class ModernDiscordBotGUI:
         self.notebook.addTab(self.settings_page, '设置')
         self.token_page = TokenPage(self.config)
         self.notebook.addTab(self.token_page, 'DC_AUTH')
+        self.proxy_page = ProxyPage(self.config)  # 添加代理页
+        self.notebook.addTab(self.proxy_page, '代理设置')
         
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.notebook)

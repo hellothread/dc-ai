@@ -115,15 +115,116 @@ class TokenPage(QtWidgets.QWidget):
     def init_ui(self):
         layout = QVBoxLayout()
         
-        self.token_listbox = QListWidget()
-        self.token_listbox.addItems(self.config.tokens["tokens"])
-        layout.addWidget(self.token_listbox)
+        # 创建 QTableWidget
+        self.token_table = QtWidgets.QTableWidget()
+        self.token_table.setColumnCount(2)  # 两列：名称、Token
+        self.token_table.setHorizontalHeaderLabels(["名称", "Token"])
         
+        # 设置最后一列占满剩余空间
+        self.token_table.horizontalHeader().setStretchLastSection(True)
+        self.token_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)  # 使 Token 列占满剩余空间
+        
+        layout.addWidget(self.token_table)
+
+        # 添加名称和 Token 的输入框
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("输入名称")
+        layout.addWidget(self.name_input)
+
+        self.token_input = QLineEdit()
+        self.token_input.setPlaceholderText("输入Token")
+        layout.addWidget(self.token_input)
+
         btn_frame = QHBoxLayout()
         add_button = QPushButton("添加AUTH")
+        add_button.clicked.connect(self.add_auth)
         btn_frame.addWidget(add_button)
-        delete_button = QPushButton("删除AUTH")
-        btn_frame.addWidget(delete_button)
-        layout.addLayout(btn_frame)
 
-        self.setLayout(layout) 
+        import_button = QPushButton("导入AUTH")
+        import_button.clicked.connect(self.import_auth)
+        btn_frame.addWidget(import_button)
+
+        delete_button = QPushButton("删除AUTH")
+        delete_button.clicked.connect(self.delete_auth)
+        btn_frame.addWidget(delete_button)
+
+        layout.addLayout(btn_frame)
+        self.setLayout(layout)
+
+    def add_auth(self):
+        name = self.name_input.text().strip()
+        token = self.token_input.text().strip()
+        if name and token:
+            row_position = self.token_table.rowCount()
+            self.token_table.insertRow(row_position)  # 插入新行
+            self.token_table.setItem(row_position, 0, QtWidgets.QTableWidgetItem(name))  # 名称
+            self.token_table.setItem(row_position, 1, QtWidgets.QTableWidgetItem(token))  # Token
+            self.name_input.clear()
+            self.token_input.clear()
+        else:
+            QtWidgets.QMessageBox.warning(self, "警告", "请填写名称和Token")
+
+    def import_auth(self):
+        options = QtWidgets.QFileDialog.Options()
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self, "导入AUTH文件", "", "Text Files (*.txt);;All Files (*)", options=options)
+        if file_name:
+            with open(file_name, 'r', encoding='utf-8') as f:
+                for line in f:
+                    name, token = line.strip().split(',')
+                    row_position = self.token_table.rowCount()
+                    self.token_table.insertRow(row_position)  # 插入新行
+                    self.token_table.setItem(row_position, 0, QtWidgets.QTableWidgetItem(name))  # 名称
+                    self.token_table.setItem(row_position, 1, QtWidgets.QTableWidgetItem(token))  # Token
+
+    def delete_auth(self):
+        selected = self.token_table.selectedIndexes()
+        if selected:
+            row = selected[0].row()
+            self.token_table.removeRow(row)
+        else:
+            QtWidgets.QMessageBox.warning(self, "警告", "请选择要删除的AUTH")
+
+class ProxyPage(QtWidgets.QWidget):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        self.proxy_listbox = QListWidget()
+        layout.addWidget(self.proxy_listbox)
+
+        # 添加代理的输入框
+        self.proxy_input = QLineEdit()
+        self.proxy_input.setPlaceholderText("输入代理 (格式: ip:port:user:password)")
+        layout.addWidget(self.proxy_input)
+
+        btn_frame = QHBoxLayout()
+        add_proxy_button = QPushButton("添加代理")
+        add_proxy_button.clicked.connect(self.add_proxy)
+        btn_frame.addWidget(add_proxy_button)
+
+        import_proxy_button = QPushButton("导入代理")
+        import_proxy_button.clicked.connect(self.import_proxy)
+        btn_frame.addWidget(import_proxy_button)
+
+        layout.addLayout(btn_frame)
+        self.setLayout(layout)
+
+    def add_proxy(self):
+        proxy = self.proxy_input.text().strip()
+        if proxy:
+            self.proxy_listbox.addItem(proxy)
+            self.proxy_input.clear()
+        else:
+            QtWidgets.QMessageBox.warning(self, "警告", "请填写代理信息")
+
+    def import_proxy(self):
+        options = QtWidgets.QFileDialog.Options()
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self, "导入代理文件", "", "Text Files (*.txt);;All Files (*)", options=options)
+        if file_name:
+            with open(file_name, 'r', encoding='utf-8') as f:
+                for line in f:
+                    self.proxy_listbox.addItem(line.strip()) 
